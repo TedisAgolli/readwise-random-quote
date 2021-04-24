@@ -11,8 +11,9 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
     res.setHeader("Cache-Control", "public, max-age=360000");
     res.setHeader("Expires", new Date(Date.now() + 360000).toUTCString());
     res.status(200).json(highlight);
+  } else {
+    res.status(400).json({ error: "Missing READWISE token query param" });
   }
-  res.status(400).json({ error: "Missing READWISE token query param" });
 };
 
 async function getBooks(token: string) {
