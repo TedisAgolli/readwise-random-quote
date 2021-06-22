@@ -1,7 +1,8 @@
 // Next.js API route support: https://nextjs.org/docs/api-routes/introduction
 
 import type { NextApiRequest, NextApiResponse } from "next";
-const BOOKS_ROUTE = "https://readwise.io/api/v2/books/";
+import cacheData from "memory-cache";
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 const HIGHLIGHTS_ROUTE = "https://readwise.io/api/v2/highlights";
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
@@ -16,53 +17,72 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   }
 };
 
-async function getBooks(token: string) {
-  return fetch(BOOKS_ROUTE, {
-    method: "Get",
-    mode: "cors",
+function getHeaders(token: string) {
+  return {
+    method: "GET",
+    mode: "cors" as RequestMode,
     headers: {
       Authorization: `TOKEN ${token}`,
+      contentType: "application/json",
     },
-  })
-    .then((res) => res.json())
-    .then((res) => {
-      return res.results.map((x) => {
-        return { id: x.id, cover_image_url: x.cover_image_url };
-      });
-    });
+  };
 }
-
-async function getRandomBook(token: string) {
-  return getBooks(token).then((books) => {
-    const randomBook = books[Math.floor(Math.random() * books.length)];
-    return randomBook;
-  });
-}
-async function getHighlights(token: string) {
-  const randomBook = await getRandomBook(token);
+async function getBookById(bookId: string, token: string) {
   return fetch(
-    `${HIGHLIGHTS_ROUTE}?${new URLSearchParams({ book_id: randomBook.id })}`,
-    {
-      method: "GET",
-      mode: "cors",
-      headers: {
-        Authorization: `TOKEN ${token}`,
-        contentType: "application/json",
-      },
-    }
-  )
-    .then((res) => res.json())
-    .then((res) => {
-      if (res.count > 0) {
-        const randomQuote =
-          res.results[Math.floor(Math.random() * res.results.length)].text;
+    `https://readwise.io/api/v2/books/${bookId}`,
+    getHeaders(token)
+  ).then((res) => res.json());
+}
 
+async function getHighlights(token: string) {
+  const numHighlights = cacheData.get(token);
+  if (numHighlights) {
+    const randomQuoteIdx = Math.floor(Math.random() * numHighlights);
+    return fetch(
+      `${HIGHLIGHTS_ROUTE}?${new URLSearchParams({
+        page_size: "1",
+        page: randomQuoteIdx.toString(),
+      })}`,
+      getHeaders(token)
+    )
+      .then((res) => res.json())
+      .then(async (res) => {
+        const bookId = res.results[0].book_id;
+        const book = await getBookById(bookId, token);
         const selectedQuote = {
-          quote: randomQuote,
-          cover: randomBook.cover_image_url,
+          quote: res.results[0].text,
+          title: book.title,
+          cover: book.cover_image_url,
         };
         return selectedQuote;
-      }
-    })
-    .catch((e) => console.log(e));
+      });
+  } else {
+    return fetch(
+      `${HIGHLIGHTS_ROUTE}?${new URLSearchParams({
+        page_size: "1",
+        page: "1",
+      })}`,
+      getHeaders(token)
+    )
+      .then((res) => res.json())
+      .then(async (res) => {
+        cacheData.put(token, res.count, DAY_IN_MS);
+        const randomQuoteIdx = Math.floor(Math.random() * res.count);
+        return await fetch(
+          `${HIGHLIGHTS_ROUTE}?${new URLSearchParams({
+            page_size: "1",
+            page: randomQuoteIdx.toString(),
+          })}`,
+          getHeaders(token)
+        )
+          .then((res) => res.json())
+          .then((res) => {
+            const selectedQuote = {
+              quote: res.results[0].text,
+            };
+            return selectedQuote;
+          });
+      })
+      .catch((e) => console.log(e));
+  }
 }
