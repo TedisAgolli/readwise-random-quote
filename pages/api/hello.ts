@@ -9,8 +9,8 @@ export default async (req: NextApiRequest, res: NextApiResponse) => {
   const token = req.query.token;
   if (token && typeof token === "string") {
     const highlight = await getHighlights(token);
-    res.setHeader("Cache-Control", "public, max-age=360000");
-    res.setHeader("Expires", new Date(Date.now() + 360000).toUTCString());
+    // res.setHeader("Cache-Control", "public, max-age=360000");
+    // res.setHeader("Expires", new Date(Date.now() + 360000).toUTCString());
     res.status(200).json(highlight);
   } else {
     res.status(400).json({ error: "Missing READWISE token query param" });
