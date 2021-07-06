@@ -7,8 +7,10 @@ const HIGHLIGHTS_ROUTE = "https://readwise.io/api/v2/highlights";
 
 export default async (req: NextApiRequest, res: NextApiResponse) => {
   const token = req.query.token;
+  console.log("Received request");
   if (token && typeof token === "string") {
     const highlight = await getHighlights(token);
+    console.log("🚀 ~ file: hello.ts ~ line 13 ~ highlight", highlight);
     // res.setHeader("Cache-Control", "public, max-age=360000");
     // res.setHeader("Expires", new Date(Date.now() + 360000).toUTCString());
     res.status(200).json(highlight);
